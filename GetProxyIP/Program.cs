@@ -47,7 +47,7 @@ namespace GetProxyIP
 
 
             Console.Read();
-
+               
         }
 
 
