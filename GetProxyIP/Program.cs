@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Policy;
 using System.Text;
 using System.Threading;
@@ -24,15 +25,16 @@ namespace GetProxyIP
             int count = 1;
             Parallel.ForEach(proxys, item =>
             {
-                if (ValidateProxy(item.IP))
+                if (ValidateProxy(item.IP,Convert.ToInt32(item.Port)))
                 {
-                    Console.WriteLine("{0} 测试成功",item.IP);
+                    Console.WriteLine("{0} 测试成功", item.IP);
                     usableProxys.Add(item);
-                    
+                    PostProxyHttp(item);
+
                 }
             });
 
-            Console.WriteLine("测试完成共{0}个代理可用",usableProxys.Count);
+            Console.WriteLine("测试完成共{0}个代理可用", usableProxys.Count);
             Console.WriteLine("是否开始请求? Y/N");
             string keyvalue = Console.ReadLine();
             if (keyvalue.Equals("Y"))
@@ -41,13 +43,13 @@ namespace GetProxyIP
                 foreach (var item in usableProxys)
                 {
                     PostProxyHttp(item);
-                    Console.WriteLine("{0} 请求完成",item.IP);
+                    Console.WriteLine("{0} 请求完成", item.IP);
                 }
             }
 
 
             Console.Read();
-               
+
         }
 
 
@@ -97,40 +99,40 @@ namespace GetProxyIP
             //========================
             // www.89ip.cn
             //======================== 
-            string bjipUrl = "http://www.89ip.cn/api.php?&tqsl=500&sxa=&sxb=&tta=&ports=&ktip=&cf=1";
-            html = HttpPost(bjipUrl, Encoding.Default);
-            var proxys = Get89ipProxy(html);
-            proxyList.AddRange(proxys);
+            //string bjipUrl = "http://www.89ip.cn/api.php?&tqsl=500&sxa=&sxb=&tta=&ports=&ktip=&cf=1";
+            //html = HttpPost(bjipUrl, Encoding.Default);
+            //var proxys = Get89ipProxy(html);
+            //proxyList.AddRange(proxys);
 
             //========================
             //  www.71https.com
             //======================== 
-            HttpPost("http://www.71https.com/index.asp", Encoding.Default);
-            HttpPost("http://www.71https.com/index.asp?page=1&yunsuo_session_verify=14aa79ba2a44866074322858310aae15", Encoding.Default);
-            //国内高匿
-            for (int i = 0; i < depth; i++)
-            {
-                string url = string.Format("http://www.71https.com/index.asp?page={0}", i + 1);
-                html = HttpPost(url, Encoding.Default);
-                var list = Get71HttpsProxy(html);
-                proxyList.AddRange(list);
-            }
+            //HttpPost("http://www.71https.com/index.asp", Encoding.Default);
+            //HttpPost("http://www.71https.com/index.asp?page=1&yunsuo_session_verify=14aa79ba2a44866074322858310aae15", Encoding.Default);
+            ////国内高匿
+            //for (int i = 0; i < depth; i++)
+            //{
+            //    string url = string.Format("http://www.71https.com/index.asp?page={0}", i + 1);
+            //    html = HttpPost(url, Encoding.Default);
+            //    var list = Get71HttpsProxy(html);
+            //    proxyList.AddRange(list);
+            //}
 
-            //国外高匿
-            for (int i = 0; i < depth; i++)
-            {
-                string url = string.Format("http://www.71https.com/index.asp?stype=3&page={0}", i + 1);
-                html = HttpPost(url, Encoding.Default);
-                var list = Get71HttpsProxy(html);
-                proxyList.AddRange(list);
-            }
+            ////国外高匿
+            //for (int i = 0; i < depth; i++)
+            //{
+            //    string url = string.Format("http://www.71https.com/index.asp?stype=3&page={0}", i + 1);
+            //    html = HttpPost(url, Encoding.Default);
+            //    var list = Get71HttpsProxy(html);
+            //    proxyList.AddRange(list);
+            //}
 
             return proxyList;
         }
 
         public static string PostProxyHttp(ProxyEntity proxy)
         {
-            string url = "http://hktest.hk515.com:1237/Default.aspx";
+            string url = "http://hktest.hk515.com:9010/Default.aspx";
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             WebProxy webproxy = new WebProxy();
             Uri uri = new Uri(string.Format("http://{0}:{1}", proxy.IP, proxy.Port));
@@ -158,7 +160,7 @@ namespace GetProxyIP
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public static string HttpPost(string url ,Encoding encode)
+        public static string HttpPost(string url, Encoding encode)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             WebProxy webproxy = new WebProxy();
@@ -181,6 +183,7 @@ namespace GetProxyIP
 
             return html;
         }
+
 
         /// <summary>
         /// 西刺
@@ -331,7 +334,7 @@ namespace GetProxyIP
         /// </summary>
         /// <param name="ip"></param>
         /// <returns></returns>
-        public static bool ValidateProxy(string ip)
+        public static bool ValidateProxy(string ip, int port)
         {
             bool result = false;
             System.Net.NetworkInformation.Ping pingSender = new System.Net.NetworkInformation.Ping();
@@ -340,8 +343,18 @@ namespace GetProxyIP
 
             if (replay.Status == System.Net.NetworkInformation.IPStatus.Success)
             {
-                //可用的Proxy
-                result = true;
+                try
+                {
+                    IPEndPoint point = new IPEndPoint(ipAddress, port);
+                    Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    socket.Connect(point);
+                    //可用的Proxy
+                    result = true;
+                }
+                catch (Exception)
+                {
+                    result = false;
+                }
             }
 
             return result;
